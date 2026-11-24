@@ -38,6 +38,10 @@
   .page-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
   .page-tabs button{background:var(--panel2);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:.82rem;cursor:pointer}
   .page-tabs button.active{background:var(--accent);color:#06241a;border-color:var(--accent)}
+  .page-check{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:.82rem;color:var(--text)}
+  .page-check input[type=checkbox]{margin:0}
+  .page-check input[type=number]{width:46px;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 5px;font:inherit;font-size:.78rem}
+  .page-check .skip-label{color:var(--muted);font-size:.74rem}
   table{border-collapse:collapse;width:100%;font-size:.82rem}
   th,td{border:1px solid var(--border);padding:6px 10px;white-space:nowrap;text-align:left}
   th{background:var(--panel2);color:var(--muted);font-weight:600}
@@ -99,6 +103,18 @@
     </div>
   </div>
 
+  <div class="panel" id="mergePanel" style="display:none">
+    <h2>One table split across several pages?</h2>
+    <p class="note" style="margin-top:0">
+      Tick the pages involved, in order, then pick how they go together. If one page has a few extra rows the others don't (a title, a repeated label), use "skip" to drop them so the rows line up before you merge. Nothing here is guessed automatically, you tell it what the pages are to each other, and you check the result in the preview before trusting it.
+    </p>
+    <div class="page-tabs" id="mergeChecks"></div>
+    <div class="actions">
+      <button class="action secondary" id="mergeSideBySide">Place side by side (same rows, more columns)</button>
+      <button class="action secondary" id="mergeStacked">Stack at the bottom (same columns, more rows)</button>
+    </div>
+  </div>
+
   <p class="note">
     Works best on PDFs that were produced digitally (exported from Excel, a web page, an invoicing tool), where the text itself can be read directly. A PDF that is really a scanned photo of a page has no text to read and will not produce a table here. Merged cells and unusually shaped tables may not line up perfectly, always check the preview before trusting the export.
   </p>
@@ -120,9 +136,13 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
   const resultPanel = document.getElementById('resultPanel');
   const pageTabs = document.getElementById('pageTabs');
   const previewTable = document.getElementById('previewTable');
+  const mergePanel = document.getElementById('mergePanel');
+  const mergeChecks = document.getElementById('mergeChecks');
 
-  let pageTables = []; // array of 2D arrays, one per page
+  let pageTables = []; // array of 2D arrays, one per page or per merged result
+  let pageNames = [];  // matching display name for each entry in pageTables
   let activePage = 0;
+  let mergeCount = 0;
 
   dropZone.addEventListener('click', ()=> fileInput.click());
   dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
@@ -228,32 +248,124 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
   async function handleFile(file){
     statusEl.textContent = 'Reading PDF…';
     resultPanel.style.display = 'none';
+    mergePanel.style.display = 'none';
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
     pageTables = [];
+    pageNames = [];
+    mergeCount = 0;
     for (let i = 1; i <= pdf.numPages; i++){
       statusEl.textContent = `Reading page ${i} of ${pdf.numPages}…`;
       const page = await pdf.getPage(i);
       const table = await buildPageTable(page);
       pageTables.push(table);
+      pageNames.push('Page ' + i);
     }
     statusEl.textContent = `Done, ${pdf.numPages} page${pdf.numPages===1?'':'s'} read.`;
     activePage = 0;
     renderTabs();
     renderPreview();
     resultPanel.style.display = 'block';
+    mergePanel.style.display = pdf.numPages > 1 ? 'block' : 'none';
   }
 
   function renderTabs(){
     pageTabs.innerHTML = '';
     pageTables.forEach((_, i)=>{
       const b = document.createElement('button');
-      b.textContent = 'Page ' + (i+1);
+      b.textContent = pageNames[i];
       if (i === activePage) b.classList.add('active');
       b.addEventListener('click', ()=>{ activePage = i; renderTabs(); renderPreview(); });
       pageTabs.appendChild(b);
     });
+    renderMergeChecks();
   }
+
+  function renderMergeChecks(){
+    mergeChecks.innerHTML = '';
+    pageTables.forEach((_, i)=>{
+      const label = document.createElement('label');
+      label.className = 'page-check';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.dataset.pageIndex = String(i);
+      const skipInput = document.createElement('input');
+      skipInput.type = 'number';
+      skipInput.min = '0';
+      skipInput.value = '0';
+      skipInput.dataset.skipFor = String(i);
+      skipInput.title = 'Rows to skip from the top of this page before merging';
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(pageNames[i]));
+      label.appendChild(document.createTextNode(' '));
+      const skipLabel = document.createElement('span');
+      skipLabel.className = 'skip-label';
+      skipLabel.textContent = 'skip';
+      label.appendChild(skipLabel);
+      label.appendChild(skipInput);
+      mergeChecks.appendChild(label);
+    });
+  }
+
+  function getSelectedPagesInOrder(){
+    return [...mergeChecks.querySelectorAll('input[type=checkbox]:checked')]
+      .map(cb => {
+        const idx = parseInt(cb.dataset.pageIndex, 10);
+        const skipInput = mergeChecks.querySelector('input[data-skip-for="' + idx + '"]');
+        const skipN = skipInput ? Math.max(0, parseInt(skipInput.value, 10) || 0) : 0;
+        return { idx, skipN };
+      })
+      .sort((a,b)=> a.idx - b.idx);
+  }
+
+  function addMergedTable(table, label){
+    pageTables.push(table);
+    pageNames.push(label);
+    activePage = pageTables.length - 1;
+    renderTabs();
+    renderPreview();
+  }
+
+  // Places the selected tables next to each other, column after column,
+  // lining rows up by position (row 1 with row 1, row 2 with row 2, and so
+  // on). Use this when the same rows continue onto a block of new columns.
+  document.getElementById('mergeSideBySide').addEventListener('click', ()=>{
+    const sel = getSelectedPagesInOrder();
+    if (sel.length < 2){ alert('Seleziona almeno due pagine da affiancare.'); return; }
+    const tables = sel.map(s => pageTables[s.idx].slice(s.skipN));
+    const maxRows = Math.max(...tables.map(t => t.length));
+    const merged = [];
+    for (let r = 0; r < maxRows; r++){
+      let row = [];
+      tables.forEach(t=>{
+        const width = t.length ? t[0].length : 0;
+        row = row.concat(t[r] || new Array(width).fill(''));
+      });
+      merged.push(row);
+    }
+    mergeCount++;
+    addMergedTable(merged, 'Unito ' + mergeCount + ' (affiancato)');
+  });
+
+  // Stacks the selected tables one under the other, keeping the same
+  // columns. Use this when a page is really just the last few rows of the
+  // table before it that did not fit.
+  document.getElementById('mergeStacked').addEventListener('click', ()=>{
+    const sel = getSelectedPagesInOrder();
+    if (sel.length < 2){ alert('Seleziona almeno due pagine da impilare.'); return; }
+    const tables = sel.map(s => pageTables[s.idx].slice(s.skipN));
+    const width = Math.max(...tables.map(t => t.length ? t[0].length : 0));
+    const merged = [];
+    tables.forEach(t=>{
+      t.forEach(row=>{
+        const padded = row.slice(0, width);
+        while (padded.length < width) padded.push('');
+        merged.push(padded);
+      });
+    });
+    mergeCount++;
+    addMergedTable(merged, 'Unito ' + mergeCount + ' (in fondo)');
+  });
 
   function renderPreview(){
     const table = pageTables[activePage] || [];
@@ -269,7 +381,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
     const wb = XLSX.utils.book_new();
     pageTables.forEach((table, i)=>{
       const ws = XLSX.utils.aoa_to_sheet(table.length ? table : [['']]);
-      XLSX.utils.book_append_sheet(wb, ws, 'Page ' + (i+1));
+      const safeName = pageNames[i].replace(/[\\/?*[\]:]/g, '').slice(0, 31) || ('Sheet ' + (i+1));
+      XLSX.utils.book_append_sheet(wb, ws, safeName);
     });
     XLSX.writeFile(wb, 'tablesnapx-export.xlsx');
   });
@@ -281,7 +394,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'tablesnapx-page-' + (activePage+1) + '.csv';
+    const safeName = (pageNames[activePage] || ('page-' + (activePage+1))).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    a.download = 'tablesnapx-' + safeName + '.csv';
     a.click();
   });
 })();
