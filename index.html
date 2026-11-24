@@ -136,34 +136,55 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
     if (e.target.files[0]) handleFile(e.target.files[0]);
   });
 
-  function clusterValues(values, threshold){
-    const sorted = [...values].sort((a,b)=>a-b);
-    const clusters = [];
-    sorted.forEach(v=>{
-      const last = clusters[clusters.length-1];
-      if (last && v - last.sum/last.count <= threshold){
-        last.sum += v; last.count += 1;
-      } else {
-        clusters.push({ sum: v, count: 1 });
-      }
+  // Finds the real gaps (whitespace with no text at all, anywhere in the
+  // structural rows) between columns, instead of clustering left-edge x
+  // positions. Left-edge clustering breaks as soon as a column holds
+  // right-aligned numbers under a left-aligned header, which is true of
+  // almost every real financial or statistical table: the header's left
+  // edge and the number's left edge can sit far enough apart to be read as
+  // two different columns. A true gap in horizontal coverage does not have
+  // that problem, because it looks at where text actually falls, not where
+  // each run happens to start.
+  function computeColumnBounds(items){
+    if (items.length === 0) return [];
+    const minX = Math.min(...items.map(it=> it.x1));
+    const maxX = Math.max(...items.map(it=> it.x2));
+    const scale = 2; // 0.5pt resolution
+    const width = Math.ceil((maxX - minX) * scale) + 4;
+    const coverage = new Uint8Array(width);
+    items.forEach(it=>{
+      const a = Math.max(0, Math.floor((it.x1 - minX) * scale));
+      const b = Math.min(width, Math.ceil((it.x2 - minX) * scale));
+      for (let i = a; i < b; i++) coverage[i] = 1;
     });
-    return clusters.map(c => c.sum / c.count);
+    const minGapPts = 3; // smallest whitespace width treated as a real column gap
+    const minGapUnits = minGapPts * scale;
+    const bounds = [minX];
+    let i = 0;
+    while (i < width){
+      if (coverage[i] === 0){
+        let j = i;
+        while (j < width && coverage[j] === 0) j++;
+        if (j - i >= minGapUnits) bounds.push(minX + (i + j) / 2 / scale);
+        i = j;
+      } else i++;
+    }
+    bounds.push(maxX + 1);
+    return bounds;
   }
 
-  function nearestIndex(value, bins){
-    let best = 0, bestDist = Infinity;
-    bins.forEach((b,i)=>{
-      const d = Math.abs(value - b);
-      if (d < bestDist){ bestDist = d; best = i; }
-    });
-    return best;
+  function segmentIndex(centerX, bounds){
+    for (let k = 0; k < bounds.length - 1; k++){
+      if (centerX >= bounds[k] && centerX < bounds[k+1]) return k;
+    }
+    return bounds.length - 2;
   }
 
   async function buildPageTable(page){
     const content = await page.getTextContent();
     const items = content.items
       .filter(it => it.str && it.str.trim() !== '')
-      .map(it => ({ str: it.str, x: it.transform[4], y: Math.round(it.transform[5]) }));
+      .map(it => ({ str: it.str, x1: it.transform[4], x2: it.transform[4] + it.width, y: Math.round(it.transform[5]) }));
 
     if (items.length === 0) return [];
 
@@ -178,23 +199,27 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
     });
     rows.sort((a,b)=> b.y - a.y);
 
-    // determine column bins from all x positions on the page
-    const allX = items.map(it=> it.x);
-    const colBins = clusterValues(allX, 12).sort((a,b)=>a-b);
+    // Only rows that already have more than one piece of text can define
+    // where the columns are. A single wide line (a title, a metadata
+    // sentence above the table) spans the whole page width and would
+    // otherwise bridge over a real column gap for every other row.
+    const structuralItems = rows.filter(r => r.items.length > 1).flatMap(r => r.items);
+    const bounds = computeColumnBounds(structuralItems.length ? structuralItems : items);
+    const numCols = Math.max(0, bounds.length - 1);
 
     const table = rows.map(row=>{
-      const cells = new Array(colBins.length).fill('');
-      row.items.sort((a,b)=> a.x - b.x).forEach(it=>{
-        const idx = nearestIndex(it.x, colBins);
+      const cells = new Array(numCols).fill('');
+      row.items.sort((a,b)=> a.x1 - b.x1).forEach(it=>{
+        const center = (it.x1 + it.x2) / 2;
+        const idx = segmentIndex(center, bounds);
         cells[idx] = cells[idx] ? cells[idx] + ' ' + it.str : it.str;
       });
       return cells;
     });
 
     // drop columns that are empty across every row (noise from stray bins)
-    const width = colBins.length;
     const usedCols = [];
-    for (let c = 0; c < width; c++){
+    for (let c = 0; c < numCols; c++){
       if (table.some(r => r[c] !== '')) usedCols.push(c);
     }
     return table.map(r => usedCols.map(c => r[c]));
