@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TableSnapX — Pull tables out of a PDF straight into Excel</title>
-<meta name="description" content="Upload a PDF, get the tables inside it back as a clean spreadsheet. Works entirely in your browser, nothing is uploaded.">
-<link rel="canonical" href="https://tablesnapx.com/">
+<title>Free PDF Table Extractor to Excel & CSV — TableSnapX</title>
+<meta name="description" content="Free PDF table extractor: upload a PDF and export its tables straight to Excel (XLSX) or CSV. Works entirely in your browser, nothing is uploaded, nothing stored.">
+<link rel="canonical" href="https://trailpawsgear.github.io/tablesnapx/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TableSnapX">
-<meta property="og:url" content="https://tablesnapx.com/">
-<meta property="og:title" content="TableSnapX — Pull tables out of a PDF straight into Excel">
-<meta property="og:description" content="Upload a PDF, get the tables inside it back as a clean spreadsheet. Works entirely in your browser, nothing is uploaded.">
-<meta property="og:image" content="https://tablesnapx.com/og-image.png">
+<meta property="og:url" content="https://trailpawsgear.github.io/tablesnapx/">
+<meta property="og:title" content="Free PDF Table Extractor to Excel & CSV — TableSnapX">
+<meta property="og:description" content="Free PDF table extractor: upload a PDF and export its tables straight to Excel (XLSX) or CSV. Works entirely in your browser, nothing is uploaded, nothing stored.">
+<meta property="og:image" content="https://trailpawsgear.github.io/tablesnapx/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="TableSnapX — Pull tables out of a PDF straight into Excel">
-<meta name="twitter:description" content="Upload a PDF, get the tables inside it back as a clean spreadsheet. Works entirely in your browser, nothing is uploaded.">
+<meta name="twitter:title" content="Free PDF Table Extractor to Excel & CSV — TableSnapX">
+<meta name="twitter:description" content="Free PDF table extractor: upload a PDF and export its tables straight to Excel (XLSX) or CSV. Works entirely in your browser, nothing is uploaded, nothing stored.">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -26,7 +26,7 @@
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
   .wrap{max-width:880px;margin:0 auto;padding:32px 16px 80px}
   header{text-align:center;margin-bottom:24px}
-  h1{font-size:1.6rem;margin:0 0 6px}
+h1,h2.tool-title{font-size:1.6rem;margin:0 0 6px}
   header p{color:var(--muted);margin:0;font-size:.95rem;max-width:560px;margin:0 auto}
   .drop{border:2px dashed var(--border);border-radius:16px;padding:40px 20px;text-align:center;margin:24px 0;cursor:pointer}
   .drop.drag{border-color:var(--accent)}
@@ -71,7 +71,7 @@
 <section class="hero">
   <div class="hero-eyebrow">DOCUMENT TOOLS</div>
   <h1>Stop retyping tables out of PDFs <span>by hand.</span></h1>
-  <p class="sub">Drop in the PDF, the rows and columns come back out as a real spreadsheet, ready to open in Excel. No retyping, no copy-paste chaos.</p>
+  <p class="sub">Free PDF table extractor: drop in the PDF, the rows and columns come back out as a real spreadsheet, ready to open in Excel or as CSV. No retyping, no copy-paste chaos.</p>
   <div class="pdf2sheet">
     <div class="icon">📄</div>
     <span class="arrow">→</span>
@@ -82,8 +82,8 @@
 <div class="wrap">
   <div id="tool">
   <header>
-    <h1>TableSnapX</h1>
-    <p>Drop in a PDF that has a table in it. Each page is read for its text and the layout is rebuilt into rows and columns, ready to export.</p>
+    <h2 class="tool-title">TableSnapX</h2>
+    <p>Free PDF table extractor: drop in a PDF that has a table in it, each page is read for its text with the layout rebuilt into rows and columns, ready to export straight to Excel or CSV. No sign-up, nothing uploaded.</p>
   </header>
 
   <div class="drop" id="dropZone">
@@ -122,7 +122,7 @@
 
   <footer>
     The PDF is read and processed entirely in your browser, nothing is uploaded anywhere.
-    <br><a href="https://tablesnapx.com">tablesnapx.com</a>
+    <br><a href="https://trailpawsgear.github.io/tablesnapx/">trailpawsgear.github.io/tablesnapx</a>
   </footer>
 </div>
 
